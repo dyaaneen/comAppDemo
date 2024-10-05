@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Communication App - Email</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="dashBoardContainer">
+        <aside>
+            <div class="dashBoardTop">
+                <div class="dashBoardLogo">
+                    <h2>Communications App</h2>
+                </div>
+            </div>
+            <div class="dashBoardSidebar">
+                <a href="/route/dashboard" style="text-decoration: none">
+                    <span class="material-symbols-outlined">grid_view</span>
+                    <h3>Dashboard</h3>
+                </a>
+                <a href="/route/sendChat" style="text-decoration: none">
+                    <span class="material-symbols-outlined">chat</span>
+                    <h3>Chat</h3>
+                </a>
+                <a href="/route/sendSMS" style="text-decoration: none">
+                    <span class="material-symbols-outlined">sms</span>
+                    <h3>Send SMS</h3>
+                </a>
+                <a href="/route/voiceCall" style="text-decoration: none">
+                    <span class="material-symbols-outlined">call</span>
+                    <h3>Voice Call</h3>
+                </a>
+                <a href="/route/sendMail" style="text-decoration: none" class="active">
+                    <span class="material-symbols-outlined">mail</span>
+                    <h3>Email</h3>
+                </a>
+            </div>
+        </aside>
+
+        <main>
+            <div class="mainTop">
+                <h2>Hello, <%= username %>!</h2>
+            </div>
+
+            <div class="content">
+                <h1>Send Email</h1>
+                <form id="emailForm" action="/send" method="POST" enctype="multipart/form-data">
+                    <label for="to">To:</label>
+                    <input type="email" id="to" name="to" required><br><br>
+                    <label for="subject">Subject:</label>
+                    <input type="text" id="subject" name="subject" required><br><br>
+                    <label for="text">Message:</label><br>
+                    <textarea id="text" name="text" required></textarea><br><br>
+                    <label for="attachment">Attachment:</label>
+                    <input type="file" name="attachment"><br><br>
+                    <button type="submit" id="submit">Send Email</button>
+                </form>
+                <p id="response"></p>
+                <button id="fetchEmails">Fetch Emails</button>
+                <p id="response"></p>
+                <div class="email-list" id="emailList"></div>
+            </div>
+
+    <script>
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+                const to = document.getElementById('to').value;
+                const subject = document.getElementById('subject').value;
+                const text = document.getElementById('text').value;
+
+            const responseElement = document.getElementById('response');
+
+            try {
+                const response = await fetch('http://localhost:3000/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({to, subject, text }),
+                });
+
+                const result = await response.text();
+                responseElement.textContent = result;
+            } catch (error) {
+                responseElement.textContent = 'Error: ' + error.message;
+            }
+        });
+
+        document.getElementById('fetchEmails').addEventListener('click', async () => {
+    const emailListElement = document.getElementById('emailList');
+    emailListElement.innerHTML = ''; // Clear previous emails
+
+    try {
+        const response = await fetch('http://localhost:3000/fetch-emails', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            emailListElement.innerHTML = '<div class="no-emails">Error: ' + error.error + '</div>';
+            return;
+        }
+
+        const data = await response.json();
+        const emails = data.emails;
+
+        if (emails.length === 0) {
+            emailListElement.innerHTML = '<div class="no-emails">No new emails.</div>';
+        } else {
+            emails.forEach((emailData, index) => {
+                const emailItem = document.createElement('div');
+                emailItem.classList.add('email-item');
+
+                // Parse the email data to extract relevant info (this assumes emailData is plain text)
+                const subjectMatch = emailData.match(/Subject:\s*(.*)/);
+                const senderMatch = emailData.match(/From:\s*(.*)/);
+                
+                emailItem.innerHTML = `
+                    <div class="email-sender">${senderMatch ? senderMatch[1] : 'Unknown Sender'}</div>
+                    <div class="email-subject">${subjectMatch ? subjectMatch[1] : 'No Subject'}</div>
+                    <div class="email-date">${new Date(emailData.date).toLocaleString()}</div>
+                `;
+
+                emailItem.addEventListener('click', async () => {
+                    const emailDetailResponse = await fetch('http://localhost:3000/read-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ seqno: index + 1 }) // Pass the index as the sequence number
+                    });
+
+                    if (emailDetailResponse.ok) {
+                        const emailDetail = await emailDetailResponse.json();
+                        alert('Email Content:\n' + emailDetail.email); // Display email content (you might want a better UI for this)
+                    } else {
+                        const error = await emailDetailResponse.json();
+                        alert('Error: ' + error.error);
+                    }
+                });
+
+                emailListElement.appendChild(emailItem);
+            });
+        }
+    } catch (error) {
+        emailListElement.innerHTML = '<div class="no-emails">Error: ' + error.message + '</div>';
+    }
+});
+                </script>
+            </div>
+
+            
+        </main>
+    </div>
+</body>
+</html>
